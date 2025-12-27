@@ -19,14 +19,15 @@ const CreateInvoice = ({ onSave, onCancel, userSettings, clients = [], invoices 
     contacts: [], selectedContact: null
   });
 
-  const [settings, setSettings] = useState({
+const [settings, setSettings] = useState({
     invoiceNo: '',
     date: new Date().toISOString().split('T')[0],
     currency: userSettings.currency,
     myState: userSettings.state,
     isLut: false,
     exchangeRate: 1,
-    datePaid: ''
+    datePaid: '',
+    gstRate: 18 // This adds the new manual GST % field
   });
 
   // -------------------------- INVOICE ID GENERATOR --------------------------
@@ -82,7 +83,8 @@ const CreateInvoice = ({ onSave, onCancel, userSettings, clients = [], invoices 
         myState: userSettings.state,
         isLut: editingInvoice.type?.includes('LUT') || false,
         exchangeRate: parseFloat(editingInvoice.exchange_rate) || 1,
-        datePaid: finalDatePaid
+        gstRate: editingInvoice.gstRate || 18, // Load saved rate or default to 18
+        datePaid: finalDatePaid || '',
       });
 
     } else {
@@ -134,20 +136,26 @@ const CreateInvoice = ({ onSave, onCancel, userSettings, clients = [], invoices 
   const removeItem = (id) => setItems(items.filter(i => i.id !== id));
   const updateItem = (id, field, value) => setItems(items.map(item => item.id === id ? { ...item, [field]: value } : item));
 
-  // -------------------------- TAX LOGIC --------------------------
+// -------------------------- TAX LOGIC --------------------------
   const subtotal = items.reduce((sum, item) => sum + (item.qty * item.price), 0);
   const isInterstate = settings.myState !== client.state;
   const isExport = client.state === 'Other';
   const isLut = settings.isLut && isExport;
 
+  // Use the manual GST rate from settings
+  const currentGstRate = parseFloat(settings.gstRate) || 0;
+  const gstDecimal = currentGstRate / 100;
+
   let cgst = 0, sgst = 0, igst = 0;
+  
   if (isExport) {
-    if (!isLut) igst = subtotal * 0.18;
+    if (!isLut) igst = subtotal * gstDecimal;
   } else if (isInterstate) {
-    igst = subtotal * 0.18;
+    igst = subtotal * gstDecimal;
   } else {
-    cgst = subtotal * 0.09;
-    sgst = subtotal * 0.09;
+    // Split the manual rate into two for local GST
+    cgst = subtotal * (gstDecimal / 2);
+    sgst = subtotal * (gstDecimal / 2);
   }
 
   const totalTax = cgst + sgst + igst;
@@ -157,18 +165,29 @@ const CreateInvoice = ({ onSave, onCancel, userSettings, clients = [], invoices 
   const handleSaveClick = async () => {
 
     // FIX: Update client details WITH AUTH
-    if (client.id && !client.id.startsWith('new')) {
+ // Update client details
+    if (client.id && !String(client.id).startsWith('new')) {
       try {
+        const token = localStorage.getItem('token');
         await fetch(`${API_URL}/clients/${client.id}`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
+            'Authorization': `Bearer ${token}` // Your Bearer token is used here
           },
-          body: JSON.stringify(client)
+          body: JSON.stringify({
+            name: client.name,
+            gstin: client.gstin,
+            address: client.address,
+            city: client.city,
+            state: client.state,
+            country: client.country,
+            contacts: client.contacts
+          })
         });
       } catch (e) {
-        console.error("Failed to update client", e);
+        console.error("Failed to update client info:", e);
+        // We continue anyway so the invoice can still save
       }
     }
 
@@ -181,6 +200,8 @@ const CreateInvoice = ({ onSave, onCancel, userSettings, clients = [], invoices 
       total: grandTotal,
       amount: grandTotal,
       tax: totalTax,
+      // NEW: Send these to the database
+      gstRate: settings.gstRate,
       status: editingInvoice ? editingInvoice.status : 'Pending',
       type: isExport ? (isLut ? 'Export (LUT)' : 'Export') :
             (isInterstate ? 'Interstate' : 'Intrastate'),
@@ -282,16 +303,20 @@ const CreateInvoice = ({ onSave, onCancel, userSettings, clients = [], invoices 
         <div className="space-y-6">
 
           {/* ---------- INVOICE SETTINGS ---------- */}
-          <Card className="p-6 space-y-4">
+<Card className="p-6 space-y-4">
             <h3 className="text-sm font-semibold dark:text-white uppercase tracking-wider">Invoice Settings</h3>
 
             <Input label="Invoice Number" value={settings.invoiceNo} onChange={(e) => setSettings({ ...settings, invoiceNo: e.target.value })} disabled={!!editingInvoice} />
-            <Input label="Date" type="date" value={settings.date} onChange={(e) => setSettings({ ...settings, date: e.target.value })} />
-            <Select label="Currency" value={settings.currency} onChange={(e) => setSettings({ ...settings, currency: e.target.value })} options={CURRENCIES} />
+            
+            <Input label="Invoice Date" type="date" value={settings.date} onChange={(e) => setSettings({ ...settings, date: e.target.value })} />
+            
+            {/* 1. NEW: DATE OF PAYMENT INPUT */}
+            <Input label="Date of Payment" type="date" value={settings.datePaid} onChange={(e) => setSettings({ ...settings, datePaid: e.target.value })} />
 
-            {editingInvoice && (editingInvoice.status === 'Paid' || settings.datePaid) && (
-              <Input label="Date Paid" type="date" value={settings.datePaid} onChange={(e) => setSettings({ ...settings, datePaid: e.target.value })} />
-            )}
+            {/* 2. NEW: MANUAL GST % INPUT */}
+            <Input label="GST Rate (%)" type="number" value={settings.gstRate} onChange={(e) => setSettings({ ...settings, gstRate: e.target.value })} placeholder="e.g. 18" />
+
+            <Select label="Currency" value={settings.currency} onChange={(e) => setSettings({ ...settings, currency: e.target.value })} options={CURRENCIES} />
 
             <div className="flex items-center gap-2 pt-2">
               <input type="checkbox" id="lut" checked={settings.isLut} onChange={(e) => setSettings({ ...settings, isLut: e.target.checked })} className="rounded border-slate-300" />
@@ -305,9 +330,11 @@ const CreateInvoice = ({ onSave, onCancel, userSettings, clients = [], invoices 
 
             <div className="space-y-2 text-sm">
               <div className="flex justify-between text-slate-600"><span>Subtotal</span><span>{settings.currency} {subtotal.toFixed(2)}</span></div>
-              {!isLut && cgst > 0 && <div className="flex justify-between"><span>CGST (9%)</span><span>{settings.currency} {cgst.toFixed(2)}</span></div>}
-              {!isLut && sgst > 0 && <div className="flex justify-between"><span>SGST (9%)</span><span>{settings.currency} {sgst.toFixed(2)}</span></div>}
-              {!isLut && igst > 0 && <div className="flex justify-between"><span>IGST (18%)</span><span>{settings.currency} {igst.toFixed(2)}</span></div>}
+              
+                {!isLut && cgst > 0 && <div className="flex justify-between"><span>CGST ({parseFloat(settings.gstRate)/2}%)</span><span>{settings.currency} {cgst.toFixed(2)}</span></div>}
+                {!isLut && sgst > 0 && <div className="flex justify-between"><span>SGST ({parseFloat(settings.gstRate)/2}%)</span><span>{settings.currency} {sgst.toFixed(2)}</span></div>}
+                {!isLut && igst > 0 && <div className="flex justify-between"><span>IGST ({settings.gstRate}%)</span><span>{settings.currency} {igst.toFixed(2)}</span></div>}
+                
               <div className="border-t pt-3 mt-3 flex justify-between font-bold text-lg dark:text-white">
                 <span>Total</span><span>{settings.currency} {grandTotal.toFixed(2)}</span>
               </div>

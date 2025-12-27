@@ -115,37 +115,51 @@ const ClientManager = ({ addToast, searchQuery, onUpdate }) => {
 
   useEffect(() => { fetchClients(); }, []);
 
-  // --- SAVE OR UPDATE CLIENT ---
-  const handleSave = async () => {
-    if (!newClient.name) return;
+// --- SAVE OR UPDATE CLIENT ---
+const handleSave = async () => {
+  if (!newClient.name) {
+    addToast("Company name is required", "error");
+    return;
+  }
 
-    try {
-      const url = editingId
-        ? `${API_URL}/clients/${editingId}`
-        : `${API_URL}/clients`;
+  try {
+    const isEditing = Boolean(editingId);
+    const url = isEditing ? `${API_URL}/clients/${editingId}` : `${API_URL}/clients`;
+    const method = isEditing ? 'PUT' : 'POST';
 
-      const method = editingId ? 'PUT' : 'POST';
+    const payload = {
+      id: isEditing ? editingId : `C-${Date.now()}`,
+      name: newClient.name,
+      gstin: newClient.gstin || "",
+      address: newClient.address || "",
+      city: newClient.city || "",
+      state: newClient.state || "",
+      country: newClient.country || "India",
+      contacts: newClient.contacts || []
+    };
 
-      const payload = { ...newClient, id: editingId || `C-${Date.now()}` };
+    const res = await fetch(url, {
+      method: method,
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload)
+    });
 
-      const res = await fetch(url, {
-        method,
-        headers: getAuthHeaders(),
-        body: JSON.stringify(payload)
-      });
+    const result = await res.json();
 
-      if (!res.ok) throw new Error("Failed to save client");
-
-      addToast(editingId ? "Client updated!" : "Client added!", "success");
-      fetchClients();
-      if (onUpdate) onUpdate();
-      handleCancel();
-
-    } catch (error) {
-      console.error(error);
-      addToast("Error saving client.", "error");
+    if (!res.ok) {
+      throw new Error(result.error || "Failed to save client");
     }
-  };
+
+    addToast(isEditing ? "Client updated!" : "Client added!", "success");
+    fetchClients();
+    if (onUpdate) onUpdate();
+    handleCancel();
+
+  } catch (error) {
+    console.error("Frontend Save Error:", error);
+    addToast(error.message, "error");
+  }
+};
 
   // --- DELETE CLIENT ---
   const handleDelete = async (id) => {

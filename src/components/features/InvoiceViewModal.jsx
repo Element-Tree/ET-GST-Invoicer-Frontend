@@ -25,8 +25,8 @@ const InvoiceViewModal = ({ invoice, userSettings, onClose, onEdit, addToast }) 
     
     invoiceNumber: invoice.id,
     issueDate: invoice.date ? new Date(invoice.date).toLocaleDateString('en-GB') : '',
-    dueDate: 'Net 30', // Or calc date
-    paymentTerms: 'Net 30',
+    dueDate: 'Net 07', // Or calc date
+    paymentTerms: 'Net 07',
     items: invoice.items || [],
     taxRate: 0.18, // Approx logic
     currency: invoice.currency || 'INR',

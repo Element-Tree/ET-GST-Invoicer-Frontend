@@ -161,6 +161,12 @@ const createInvoicePDF = async (invoice, userSettings) => {
     ? new Date(invoice.date).toLocaleDateString("en-GB")
     : "";
   doc.text(`Issue Date: ${dateStr}`, pageWidth - margin, topY + 14, { align: "right" });
+  const datePaid = invoice.datePaid || invoice.date_paid;
+  if (datePaid) {
+    const paidDateStr = new Date(datePaid).toLocaleDateString("en-GB");
+    doc.setTextColor(20, 184, 166); // Teal color
+    doc.text(`Date Paid: ${paidDateStr}`, pageWidth - margin, topY + 20, { align: "right" });
+  }
 
   doc.setDrawColor(...colors.grayBorder);
   doc.line(margin, topY + 25, pageWidth - margin, topY + 25);
@@ -264,11 +270,11 @@ const createInvoicePDF = async (invoice, userSettings) => {
   doc.setFont("helvetica", "bold");
 
   const issue = invoice.date ? new Date(invoice.date) : new Date();
-  issue.setDate(issue.getDate() + 30);
+  issue.setDate(issue.getDate() + 7);
   const dueDateStr = issue.toLocaleDateString("en-GB");
 
   doc.text(dueDateStr, margin + 5, barY + 9);
-  doc.text("Net 30", pageWidth / 2, barY + 9, { align: "center" });
+  doc.text("Net 07", pageWidth / 2, barY + 9, { align: "center" });
   doc.text(`${safe(invoice.currency)}`, pageWidth - margin - 5, barY + 9, { align: "right" });
 
   // ---------------- TABLE ----------------
@@ -352,16 +358,20 @@ const createInvoicePDF = async (invoice, userSettings) => {
   let tY = cursorY + 5;
   printTotal("Subtotal", formatCurrency(subtotal), tY);
 
-  if (tax > 0) {
+if (tax > 0) {
+    // Calculate the rate based on the tax and subtotal
+    const manualRate = invoice.gstRate || 18; 
+    
     if (isLocal) {
-      const half = tax / 2;
+      const halfTax = tax / 2;
+      const halfRate = manualRate / 2;
       tY += 4;
-      printTotal("CGST (9%)", formatCurrency(half), tY, false, [249, 115, 22]);
+      printTotal(`CGST (${halfRate}%)`, formatCurrency(halfTax), tY, false, [249, 115, 22]);
       tY += 4;
-      printTotal("SGST (9%)", formatCurrency(half), tY, false, [249, 115, 22]);
+      printTotal(`SGST (${halfRate}%)`, formatCurrency(halfTax), tY, false, [249, 115, 22]);
     } else {
       tY += 4;
-      printTotal("IGST (18%)", formatCurrency(tax), tY, false, [249, 115, 22]);
+      printTotal(`IGST (${manualRate}%)`, formatCurrency(tax), tY, false, [249, 115, 22]);
     }
   } else {
     tY += 4;
@@ -431,7 +441,7 @@ const createInvoicePDF = async (invoice, userSettings) => {
 
   let bankTextY = bottomTopY + 12;
 
-  if (bank) {
+if (bank) {
     const addLine = (l, v) => {
       doc.text(`${l}:`, bankX + 5, bankTextY);
       doc.text(safe(v) || "-", bankX + 30, bankTextY);
@@ -440,8 +450,11 @@ const createInvoicePDF = async (invoice, userSettings) => {
     addLine("Bank", bank.bankName);
     addLine("Name", userSettings.companyName || "Elementree");
     addLine("A/C No", bank.accountNo);
-    if (bank.swift) addLine("SWIFT", bank.swift);
-    else if (bank.ifsc) addLine("IFSC", bank.ifsc);
+    
+    // CHANGE THIS PART:
+    if (bank.ifsc) addLine("IFSC", bank.ifsc); 
+    if (bank.swift) addLine("SWIFT", bank.swift); 
+    
   } else {
     doc.text("Please add bank details in Settings.", bankX + 5, bankTextY);
   }

@@ -6,13 +6,13 @@
   "scripts": {
     "dev": "vite",
     "build": "npm run build:staging && npm run build:prod",
-    "build:staging": "vite build --mode staging --outDir dist-staging",
     "build:prod": "vite build --mode production --outDir dist-production",
     "lint": "eslint .",
     "preview": "vite preview"
   },
   "dependencies": {
     "clsx": "^2.1.1",
+    "cross-env": "^10.1.0",
     "jspdf": "^3.0.4",
     "jspdf-autotable": "^5.0.2",
     "jszip": "^3.10.1",
