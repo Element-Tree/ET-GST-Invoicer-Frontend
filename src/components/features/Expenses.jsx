@@ -293,7 +293,7 @@ const handleFileChange = async (e) => {
         <div>
           <h2 className="text-2xl font-bold dark:text-white">Expense Tracker</h2>
           <p className="text-slate-500 text-sm">
-            Manage company SPENDING and Input Tax Credits
+            Manage company spending and Input Tax Credits
           </p>
         </div>
 
