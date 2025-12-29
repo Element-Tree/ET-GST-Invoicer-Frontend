@@ -40,8 +40,14 @@ export const getQuarter = (dateString) => {
   if (!dateString) return '';
   const date = new Date(dateString);
   const month = date.getMonth() + 1;
-  if (month >= 4 && month <= 6) return 'Q1 (Apr-Jun)';
-  if (month >= 7 && month <= 9) return 'Q2 (Jul-Sep)';
-  if (month >= 10 && month <= 12) return 'Q3 (Oct-Dec)';
-  return 'Q4 (Jan-Mar)';
+  const year = date.getFullYear();
+  
+  let q = '';
+  if (month >= 4 && month <= 6) q = 'Q1 (Apr-Jun)';
+  else if (month >= 7 && month <= 9) q = 'Q2 (Jul-Sep)';
+  else if (month >= 10 && month <= 12) q = 'Q3 (Oct-Dec)';
+  else q = 'Q4 (Jan-Mar)';
+
+  // This adds the year so the filter is precise (e.g., "Q1 (Apr-Jun) 2025")
+  return `${q} ${year}`;
 };

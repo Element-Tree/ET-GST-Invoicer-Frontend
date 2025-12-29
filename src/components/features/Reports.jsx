@@ -20,6 +20,7 @@ const Reports = ({ invoices = [], expenses = [], userSettings, addToast }) => {
   const [periodType, setPeriodType] = useState('Monthly'); // 'Monthly' or 'Quarterly'
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7)); // YYYY-MM
   const [selectedQuarter, setSelectedQuarter] = useState('Q1 (Apr-Jun)'); // Default Quarter
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
 
   const [exchangeRates, setExchangeRates] = useState(null); // Live Rates
   const [isZipping, setIsZipping] = useState(false);
@@ -55,27 +56,41 @@ const Reports = ({ invoices = [], expenses = [], userSettings, addToast }) => {
     return { value: safeAmount * rate, usedRate: rate };
   };
 
-  // --- 3. Filter Data (Monthly OR Quarterly) ---
-  const { filteredInvoices, filteredExpenses } = useMemo(() => {
-    const filterFn = (item) => {
-        if (!item.date) return false;
-        try {
-            const dateStr = item.date.includes('T') ? item.date.split('T')[0] : item.date;
-            
-            if (periodType === 'Monthly') {
-                return dateStr.startsWith(selectedMonth);
-            } else {
-                // Check Quarter
-                return getQuarter(dateStr) === selectedQuarter;
-            }
-        } catch (e) { return false; }
-    };
+// --- 3. Filter Data (Monthly OR Quarterly) ---
+const { filteredInvoices, filteredExpenses } = useMemo(() => {
+  const filterFn = (item) => {
+    if (!item.date) return false;
+    try {
+      const date = new Date(item.date);
+      const month = date.getMonth(); // 0 = Jan
+      const year = date.getFullYear();
+      const dateStr = item.date.split('T')[0];
 
-    return {
-        filteredInvoices: invoices.filter(filterFn),
-        filteredExpenses: expenses.filter(filterFn)
-    };
-  }, [invoices, expenses, periodType, selectedMonth, selectedQuarter]);
+      if (periodType === 'Monthly') {
+        return dateStr.startsWith(selectedMonth);
+      } else {
+        // 1. Determine the Quarter
+        let itemQuarter = "";
+        if (month >= 3 && month <= 5) itemQuarter = "Q1 (Apr-Jun)";
+        else if (month >= 6 && month <= 8) itemQuarter = "Q2 (Jul-Sep)";
+        else if (month >= 9 && month <= 11) itemQuarter = "Q3 (Oct-Dec)";
+        else itemQuarter = "Q4 (Jan-Mar)";
+
+        // 2. Determine the Fiscal Year
+        // If Jan-Mar (Q4), it belongs to the previous year's fiscal cycle, 
+        // but for simple reporting, we match the calendar year:
+        const isYearMatch = year === selectedYear;
+
+        return itemQuarter === selectedQuarter && isYearMatch;
+      }
+    } catch (e) { return false; }
+  };
+
+  return {
+    filteredInvoices: invoices.filter(filterFn),
+    filteredExpenses: expenses.filter(filterFn)
+  };
+}, [invoices, expenses, periodType, selectedMonth, selectedQuarter, selectedYear]);
 
   // --- 4. Calculate Totals (Converted to INR) ---
   const totals = useMemo(() => {
@@ -251,13 +266,43 @@ const Reports = ({ invoices = [], expenses = [], userSettings, addToast }) => {
             </div>
 
             {/* Conditional Input */}
-            <div className="w-40">
-                {periodType === 'Monthly' ? (
-                   <input type="month" value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)} className="flex h-10 w-full rounded-md border border-slate-300 bg-transparent px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#3194A0] dark:border-slate-600 dark:text-white dark:bg-slate-800" />
-                ) : (
-                   <Select value={selectedQuarter} onChange={(e) => setSelectedQuarter(e.target.value)} options={[{ label: "Q1 (Apr-Jun)", value: "Q1 (Apr-Jun)" }, { label: "Q2 (Jul-Sep)", value: "Q2 (Jul-Sep)" }, { label: "Q3 (Oct-Dec)", value: "Q3 (Oct-Dec)" }, { label: "Q4 (Jan-Mar)", value: "Q4 (Jan-Mar)" }]} />
-                )}
-            </div>
+        <div className="flex gap-2">
+        {/* Year Selector */}
+        <div className="w-32">
+            <Select 
+            value={selectedYear} 
+            onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+            options={[
+                { label: "2024", value: 2024 },
+                { label: "2025", value: 2025 },
+                { label: "2026", value: 2026 }
+            ]}
+            />
+        </div>
+
+        {/* Monthly/Quarterly Input */}
+        <div className="w-40">
+            {periodType === 'Monthly' ? (
+            <input 
+                type="month" 
+                value={selectedMonth} 
+                onChange={(e) => setSelectedMonth(e.target.value)} 
+                className="flex h-10 w-full rounded-md border border-slate-300 bg-transparent px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#3194A0] dark:border-slate-600 dark:text-white dark:bg-slate-800" 
+            />
+            ) : (
+            <Select 
+                value={selectedQuarter} 
+                onChange={(e) => setSelectedQuarter(e.target.value)} 
+                options={[
+                { label: "Q1 (Apr-Jun)", value: "Q1 (Apr-Jun)" },
+                { label: "Q2 (Jul-Sep)", value: "Q2 (Jul-Sep)" },
+                { label: "Q3 (Oct-Dec)", value: "Q3 (Oct-Dec)" },
+                { label: "Q4 (Jan-Mar)", value: "Q4 (Jan-Mar)" }
+                ]} 
+            />
+            )}
+        </div>
+        </div>
             
             <Button onClick={handleExportExcel} variant="outline" icon={FileText}>Excel</Button>
          </div>
