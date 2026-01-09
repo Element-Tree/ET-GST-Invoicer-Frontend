@@ -138,22 +138,25 @@ const [settings, setSettings] = useState({
 
 // -------------------------- TAX LOGIC --------------------------
   const subtotal = items.reduce((sum, item) => sum + (item.qty * item.price), 0);
+  
+  // Logic: Compare your company's state (settings.myState) with the client's state
   const isInterstate = settings.myState !== client.state;
   const isExport = client.state === 'Other';
   const isLut = settings.isLut && isExport;
 
-  // Use the manual GST rate from settings
   const currentGstRate = parseFloat(settings.gstRate) || 0;
   const gstDecimal = currentGstRate / 100;
 
   let cgst = 0, sgst = 0, igst = 0;
   
   if (isExport) {
+    // Exports are treated as Interstate; IGST applies if no LUT is present
     if (!isLut) igst = subtotal * gstDecimal;
   } else if (isInterstate) {
+    // Different states: Apply full IGST
     igst = subtotal * gstDecimal;
   } else {
-    // Split the manual rate into two for local GST
+    // Same state: Split the rate into CGST and SGST
     cgst = subtotal * (gstDecimal / 2);
     sgst = subtotal * (gstDecimal / 2);
   }
@@ -329,14 +332,36 @@ const [settings, setSettings] = useState({
             <h3 className="text-sm font-semibold dark:text-white uppercase tracking-wider mb-4">Summary</h3>
 
             <div className="space-y-2 text-sm">
-              <div className="flex justify-between text-slate-600"><span>Subtotal</span><span>{settings.currency} {subtotal.toFixed(2)}</span></div>
+              <div className="flex justify-between text-slate-600">
+                <span>Subtotal</span>
+                <span>{settings.currency} {subtotal.toFixed(2)}</span>
+              </div>
               
-                {!isLut && cgst > 0 && <div className="flex justify-between"><span>CGST ({parseFloat(settings.gstRate)/2}%)</span><span>{settings.currency} {cgst.toFixed(2)}</span></div>}
-                {!isLut && sgst > 0 && <div className="flex justify-between"><span>SGST ({parseFloat(settings.gstRate)/2}%)</span><span>{settings.currency} {sgst.toFixed(2)}</span></div>}
-                {!isLut && igst > 0 && <div className="flex justify-between"><span>IGST ({settings.gstRate}%)</span><span>{settings.currency} {igst.toFixed(2)}</span></div>}
+              {/* Only show CGST & SGST if they are greater than zero (Intrastate) */}
+              {cgst > 0 && (
+                <>
+                  <div className="flex justify-between">
+                    <span>CGST ({currentGstRate / 2}%)</span>
+                    <span>{settings.currency} {cgst.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>SGST ({currentGstRate / 2}%)</span>
+                    <span>{settings.currency} {sgst.toFixed(2)}</span>
+                  </div>
+                </>
+              )}
+
+              {/* Only show IGST if it is greater than zero (Interstate/Export) */}
+              {igst > 0 && (
+                <div className="flex justify-between">
+                  <span>IGST ({currentGstRate}%)</span>
+                  <span>{settings.currency} {igst.toFixed(2)}</span>
+                </div>
+              )}
                 
               <div className="border-t pt-3 mt-3 flex justify-between font-bold text-lg dark:text-white">
-                <span>Total</span><span>{settings.currency} {grandTotal.toFixed(2)}</span>
+                <span>Total</span>
+                <span>{settings.currency} {grandTotal.toFixed(2)}</span>
               </div>
             </div>
           </Card>
