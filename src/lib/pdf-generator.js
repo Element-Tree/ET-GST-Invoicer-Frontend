@@ -135,15 +135,29 @@ const createInvoicePDF = async (invoice, userSettings) => {
   };
 
   // ---------------- HEADER ----------------
-  let topY = 15;
-  
-  // Render Small Logo in Header
-  if (userSettings && userSettings.logo) {
-    const headerLogo = await loadImageAsBase64(userSettings.logo);
-    if (headerLogo) {
-       doc.addImage(headerLogo, "PNG", margin, topY, 20, 20);
+    let topY = 15;
+    
+    // Render Small Logo in Header (Maintaining Aspect Ratio)
+    if (userSettings && userSettings.logo) {
+      const headerLogo = await loadImageAsBase64(userSettings.logo);
+      if (headerLogo) {
+        // Load image to calculate dimensions
+        const img = new Image();
+        img.src = headerLogo;
+        await new Promise((resolve) => (img.onload = resolve));
+
+        const imgW = img.width;
+        const imgH = img.height;
+        const aspectRatio = imgH / imgW;
+
+        // Set a fixed width (e.g., 25mm) and calculate height based on ratio
+        const logoWidth = 25; 
+        const logoHeight = logoWidth * aspectRatio;
+
+        // Add the image using calculated height
+        doc.addImage(headerLogo, "PNG", margin, topY, logoWidth, logoHeight);
+      }
     }
-  }
 
   doc.setFontSize(24);
   doc.setTextColor(...colors.textPrimary);
