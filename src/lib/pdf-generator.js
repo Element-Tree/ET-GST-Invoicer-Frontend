@@ -46,8 +46,8 @@ const createInvoicePDF = async (invoice, userSettings) => {
   const pageHeight = doc.internal.pageSize.height;
 
   /* --------------------------------------------------------------
-     WATERMARK (Company Logo)
-  -------------------------------------------------------------- */
+      WATERMARK (Company Logo)
+   -------------------------------------------------------------- */
   const drawWatermark = async () => {
     if (!userSettings.logo) return;
 
@@ -135,30 +135,32 @@ const createInvoicePDF = async (invoice, userSettings) => {
   };
 
   // ---------------- HEADER ----------------
-    let topY = 15;
-    let headerLineY = topY + 25; // This is the line that separates header from address
+  let topY = 15;
+  let headerLineY = topY + 25; // Base position
 
-    // Render Small Logo in Header (Maintaining Aspect Ratio)
-    if (userSettings && userSettings.logo) {
-      const headerLogo = await loadImageAsBase64(userSettings.logo);
-      if (headerLogo) {
-        // Load image to calculate dimensions
-        const img = new Image();
-        img.src = headerLogo;
-        await new Promise((resolve) => (img.onload = resolve));
+  // Render Small Logo in Header (Maintaining Aspect Ratio)
+  if (userSettings && userSettings.logo) {
+    const headerLogo = await loadImageAsBase64(userSettings.logo);
+    if (headerLogo) {
+      const img = new Image();
+      img.src = headerLogo;
+      await new Promise((resolve) => (img.onload = resolve));
 
-        const imgW = img.width;
-        const imgH = img.height;
-        const aspectRatio = imgH / imgW;
+      const imgW = img.width;
+      const imgH = img.height;
+      const aspectRatio = imgH / imgW;
 
-        // Set a fixed width (e.g., 25mm) and calculate height based on ratio
-        const logoWidth = 25; 
-        const logoHeight = logoWidth * aspectRatio;
+      const logoWidth = 25; 
+      const logoHeight = logoWidth * aspectRatio;
 
-        // Add the image using calculated height
-        doc.addImage(headerLogo, "PNG", margin, topY, logoWidth, logoHeight);
+      // FIX: Adjust the header line position dynamically if the logo is tall
+      if (logoHeight > 20) {
+        headerLineY = topY + logoHeight + 5;
       }
+
+      doc.addImage(headerLogo, "PNG", margin, topY, logoWidth, logoHeight);
     }
+  }
 
   doc.setFontSize(24);
   doc.setTextColor(...colors.textPrimary);
@@ -179,17 +181,14 @@ const createInvoicePDF = async (invoice, userSettings) => {
   const datePaid = invoice.datePaid || invoice.date_paid;
   if (datePaid) {
     const paidDateStr = new Date(datePaid).toLocaleDateString("en-GB");
-    doc.setTextColor(20, 184, 166); // Teal color
+    doc.setTextColor(20, 184, 166); 
     doc.text(`Date Paid: ${paidDateStr}`, pageWidth - margin, topY + 20, { align: "right" });
   }
 
   doc.setDrawColor(...colors.grayBorder);
   doc.line(margin, headerLineY, pageWidth - margin, headerLineY);
 
-  
-
   // ---------------- ADDRESS BOXES ----------------
-  // Update the starting point for the Address Boxes so they don't overlap the line
   const addrY = headerLineY + 10;
   const boxWidth = contentWidth / 2 - 6;
   const boxHeight = 48;
@@ -376,8 +375,7 @@ const createInvoicePDF = async (invoice, userSettings) => {
   let tY = cursorY + 5;
   printTotal("Subtotal", formatCurrency(subtotal), tY);
 
-if (tax > 0) {
-    // Calculate the rate based on the tax and subtotal
+  if (tax > 0) {
     const manualRate = invoice.gstRate || 18; 
     
     if (isLocal) {
@@ -459,7 +457,7 @@ if (tax > 0) {
 
   let bankTextY = bottomTopY + 12;
 
-if (bank) {
+  if (bank) {
     const addLine = (l, v) => {
       doc.text(`${l}:`, bankX + 5, bankTextY);
       doc.text(safe(v) || "-", bankX + 30, bankTextY);
@@ -469,7 +467,6 @@ if (bank) {
     addLine("Name", userSettings.companyName || "Elementree");
     addLine("A/C No", bank.accountNo);
     
-    // CHANGE THIS PART:
     if (bank.ifsc) addLine("IFSC", bank.ifsc); 
     if (bank.swift) addLine("SWIFT", bank.swift); 
     
@@ -481,10 +478,6 @@ if (bank) {
   const pageCount = doc.internal.getNumberOfPages();
   for (let i = 1; i <= pageCount; i++) {
     doc.setPage(i);
-    // Draw Watermark on every page
-    // NOTE: Already called once for page 1, and addPage calls it. This loop ensures it's on ALL pages.
-    // If you see double watermarks, we can adjust. But usually safe.
-    
     doc.setDrawColor(...colors.grayBorder);
     doc.line(margin, FOOTER_RULE_Y, pageWidth - margin, FOOTER_RULE_Y);
     doc.setFontSize(7);
