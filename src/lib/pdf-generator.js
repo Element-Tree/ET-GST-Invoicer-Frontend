@@ -136,7 +136,8 @@ const createInvoicePDF = async (invoice, userSettings) => {
 
   // ---------------- HEADER ----------------
     let topY = 15;
-    
+    let headerLineY = topY + 25; // This is the line that separates header from address
+
     // Render Small Logo in Header (Maintaining Aspect Ratio)
     if (userSettings && userSettings.logo) {
       const headerLogo = await loadImageAsBase64(userSettings.logo);
@@ -183,10 +184,13 @@ const createInvoicePDF = async (invoice, userSettings) => {
   }
 
   doc.setDrawColor(...colors.grayBorder);
-  doc.line(margin, topY + 25, pageWidth - margin, topY + 25);
+  doc.line(margin, headerLineY, pageWidth - margin, headerLineY);
+
+  
 
   // ---------------- ADDRESS BOXES ----------------
-  const addrY = topY + 35;
+  // Update the starting point for the Address Boxes so they don't overlap the line
+  const addrY = headerLineY + 10;
   const boxWidth = contentWidth / 2 - 6;
   const boxHeight = 48;
 
