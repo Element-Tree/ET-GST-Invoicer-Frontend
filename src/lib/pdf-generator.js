@@ -40,6 +40,19 @@ const loadImageAsBase64 = async (url) => {
 ---------------------------------------------------------------------------------------------------*/
 const createInvoicePDF = async (invoice, userSettings) => {
   const safe = (t) => (t || "").toString();
+  const normalized = (v) => safe(v).trim().toLowerCase();
+  const getTaxMode = () => {
+    const type = normalized(invoice.type);
+    const clientState = normalized(invoice.client?.state);
+    const myState = normalized(invoice.myState || invoice.sellerState);
+
+    if (type.includes("export") || type.includes("lut") || clientState === "other") return "export";
+    if (myState && clientState) return myState === clientState ? "intrastate" : "interstate";
+    if (type.includes("intrastate") || type.includes("cgst") || type.includes("sgst")) return "intrastate";
+    if (type.includes("interstate") || type.includes("igst")) return "interstate";
+
+    return "interstate";
+  };
 
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.width;
@@ -356,7 +369,10 @@ const createInvoicePDF = async (invoice, userSettings) => {
   const amount = parseFloat(invoice.amount) || 0;
   const tax = parseFloat(invoice.tax) || 0;
   const subtotal = amount - tax;
-  const isLocal = safe(invoice.type).toLowerCase().includes("intrastate");
+  const taxMode = getTaxMode();
+  const isLocal = taxMode === "intrastate";
+  
+  console.log("User State:", userState, "Client State:", clientState);
 
   const lastTableY = doc.lastAutoTable?.finalY || tableHeaderY + 10;
   let cursorY = lastTableY + 6;
@@ -414,10 +430,7 @@ if (tax > 0) {
   const bottomTopY = getBottomBlockTopY();
   const colWidth = contentWidth / 2 - 6;
 
-  const isExport =
-    safe(invoice.type).toLowerCase().includes("lut") ||
-    safe(invoice.type).toLowerCase().includes("export") ||
-    (invoice.client && safe(invoice.client.state) === "Other");
+  const isExport = taxMode === "export";
 
   let notesY = bottomTopY;
 
