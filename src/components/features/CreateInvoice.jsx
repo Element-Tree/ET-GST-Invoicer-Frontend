@@ -197,7 +197,7 @@ const [settings, setSettings] = useState({
     onSave({
       id: settings.invoiceNo,
       invoiceNo: settings.invoiceNo,
-      client,
+      client: { ...client, selectedContact: client.selectedContact },
       items,
       date: settings.date,
       total: grandTotal,

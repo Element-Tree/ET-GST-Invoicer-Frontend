@@ -1,0 +1,4 @@
+node_modules
+dist-production
+.env
+package-lock.json
